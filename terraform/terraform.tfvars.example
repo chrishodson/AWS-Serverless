@@ -1,0 +1,22 @@
+/**
+ * AWS Serverless Integration with Port.io
+ * terraform.tfvars - Variable values (replace with actual values)
+ */
+
+aws_region         = "us-east-1"
+port_client_id     = "YOUR_PORT_CLIENT_ID"
+port_client_secret = "YOUR_PORT_CLIENT_SECRET"
+webhook_secret     = "YOUR_WEBHOOK_SECRET"
+
+# Optional pre-existing webhook URLs
+webhook_urls = {
+  # ec2 = "https://api.getport.io/v1/webhooks/WEBHOOK_ID/ec2"
+  # s3  = "https://api.getport.io/v1/webhooks/WEBHOOK_ID/s3"
+  # rds = "https://api.getport.io/v1/webhooks/WEBHOOK_ID/rds"
+  # sqs = "https://api.getport.io/v1/webhooks/WEBHOOK_ID/sqs"
+}
+
+sqs_queue_name     = "port-aws-events-queue"
+event_bridge_name  = "port-aws-events-bridge"
+lambda_name        = "port-aws-event-processor"
+lambda_execution_role = "port-aws-lambda-role"
