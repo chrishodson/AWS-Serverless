@@ -2,14 +2,18 @@
 AWS integration to port.io that is event driven and serverless
 
 ## These terraform scripts will:
-1. Create/validate a webhook in port for each AWS type supported
-1. Set up blueprints and mapps for each support AWS type
+
+### Within Port:
+1. Create a webhook for each AWS type supported
+1. Set up blueprints and mappings for each supported AWS type
+
+### Within AWS:
 1. Create/validate an SQS queue
 1. Create an EventBridge rule in the AWS account.
     1. Filter on the supported AWS types
     1. For all events, put the event into SQS
 1. Create a lambda that reads SQS and put the events into the correct webhook
-    1. Create env variables for:
+    1. Uses env variables for:
          1. webhook secret
          1. SQS queue name
          1. webhook name for each supported service
