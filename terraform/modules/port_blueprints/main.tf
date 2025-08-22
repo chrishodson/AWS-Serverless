@@ -6,7 +6,7 @@
 # EC2 Instance Blueprint
 resource "port_blueprint" "ec2_instance" {
   title      = "EC2 Instance"
-  icon       = "AWS"
+  icon       = "EC2"
   identifier = "ec2-instance"
   
   schema = {
@@ -22,6 +22,15 @@ resource "port_blueprint" "ec2_instance" {
       state = {
         title = "State"
         type  = "string"
+        enum  = ["pending", "running", "shutting-down", "terminated", "stopping", "stopped"]
+        enumColors = {
+          pending        = "yellow"
+          running        = "green"
+          "shutting-down" = "pink"
+          stopped        = "purple"
+          stopping       = "orange"
+          terminated     = "red"
+        }
       }
       region = {
         title = "Region"
@@ -40,8 +49,25 @@ resource "port_blueprint" "ec2_instance" {
         type  = "string"
         format = "date-time"
       }
+      image = {
+        title = "Image ID"
+        type  = "string"
+      }
+      key_name = {
+        title = "Key Name"
+        type  = "string"
+      }
     }
     required = ["instance_id", "instance_type", "state"]
+  }
+
+  relations = {
+    account = {
+      title   = "Account"
+      target  = "awsAccount"
+      required = false
+      many     = false
+    }
   }
 }
 
@@ -86,7 +112,7 @@ resource "port_blueprint" "s3_bucket" {
 # RDS Instance Blueprint
 resource "port_blueprint" "rds_instance" {
   title      = "RDS Instance"
-  icon       = "AWS"
+  icon       = "AmazonRDS"
   identifier = "rds-instance"
   
   schema = {
@@ -119,12 +145,16 @@ resource "port_blueprint" "rds_instance" {
         title = "Availability Zone"
         type  = "string"
       }
+      endpoint = {
+        title = "Endpoint"
+        type  = "string"
+      }
       tags = {
         title = "Tags"
         type  = "object"
       }
     }
-    required = ["db_instance_identifier", "engine", "status"]
+    required = ["db_instance_identifier", "engine", "status", "region", "endpoint"]
   }
 }
 
