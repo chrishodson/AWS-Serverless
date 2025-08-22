@@ -37,7 +37,7 @@ resource "aws_cloudwatch_event_rule" "ec2_state_change" {
 resource "aws_cloudwatch_event_target" "ec2_webhook" {
   rule      = aws_cloudwatch_event_rule.ec2_state_change.name
   target_id = "SendToPortWebhook"
-  arn       = "arn:aws:events:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:api-destination/port-ec2-webhook"
+  arn       = "arn:aws:events:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:api-destination/port-ec2-webhook"
   
   event_bus_name = aws_cloudwatch_event_bus.port_event_bus.name
 }
