@@ -8,63 +8,39 @@ resource "port_blueprint" "ec2_instance" {
   title      = "EC2 Instance"
   icon       = "EC2"
   identifier = "ec2-instance"
-  
-  schema = {
-    properties = {
-      instance_id = {
-        title = "Instance ID"
-        type  = "string"
-      }
-      instance_type = {
-        title = "Instance Type"
-        type  = "string"
-      }
+
+  properties = {
+    string_props = {
+      instance_id = { title = "Instance ID", required = true }
+      instance_type = { title = "Instance Type", required = true }
       state = {
         title = "State"
-        type  = "string"
         enum  = ["pending", "running", "shutting-down", "terminated", "stopping", "stopped"]
-        enumColors = {
-          pending        = "yellow"
-          running        = "green"
+        enum_colors = {
+          pending         = "yellow"
+          running         = "green"
           "shutting-down" = "pink"
-          stopped        = "purple"
-          stopping       = "orange"
-          terminated     = "red"
+          stopped         = "purple"
+          stopping        = "orange"
+          terminated      = "red"
         }
+        required = true
       }
-      region = {
-        title = "Region"
-        type  = "string"
-      }
-      availability_zone = {
-        title = "Availability Zone"
-        type  = "string"
-      }
-      tags = {
-        title = "Tags"
-        type  = "object"
-      }
-      launch_time = {
-        title = "Launch Time"
-        type  = "string"
-        format = "date-time"
-      }
-      image = {
-        title = "Image ID"
-        type  = "string"
-      }
-      key_name = {
-        title = "Key Name"
-        type  = "string"
-      }
+      region = { title = "Region" }
+      availability_zone = { title = "Availability Zone" }
+      launch_time = { title = "Launch Time", format = "date-time" }
+      image = { title = "Image ID" }
+      key_name = { title = "Key Name" }
     }
-    required = ["instance_id", "instance_type", "state"]
+    object_props = {
+      tags = { title = "Tags" }
+    }
   }
 
   relations = {
     account = {
-      title   = "Account"
-      target  = "awsAccount"
+      title    = "Account"
+      target   = "awsAccount"
       required = false
       many     = false
     }
@@ -76,36 +52,20 @@ resource "port_blueprint" "s3_bucket" {
   title      = "S3 Bucket"
   icon       = "AWS"
   identifier = "s3-bucket"
-  
-  schema = {
-    properties = {
-      bucket_name = {
-        title = "Bucket Name"
-        type  = "string"
-      }
-      creation_date = {
-        title = "Creation Date"
-        type  = "string"
-        format = "date-time"
-      }
-      region = {
-        title = "Region"
-        type  = "string"
-      }
-      versioning_enabled = {
-        title = "Versioning Enabled"
-        type  = "boolean"
-      }
-      acl = {
-        title = "ACL"
-        type  = "string"
-      }
-      tags = {
-        title = "Tags"
-        type  = "object"
-      }
+
+  properties = {
+    string_props = {
+      bucket_name = { title = "Bucket Name", required = true }
+      creation_date = { title = "Creation Date", format = "date-time", required = true }
+      region = { title = "Region", required = true }
+      acl = { title = "ACL" }
     }
-    required = ["bucket_name", "creation_date", "region"]
+    boolean_props = {
+      versioning_enabled = { title = "Versioning Enabled" }
+    }
+    object_props = {
+      tags = { title = "Tags" }
+    }
   }
 }
 
@@ -114,47 +74,21 @@ resource "port_blueprint" "rds_instance" {
   title      = "RDS Instance"
   icon       = "AmazonRDS"
   identifier = "rds-instance"
-  
-  schema = {
-    properties = {
-      db_instance_identifier = {
-        title = "DB Instance Identifier"
-        type  = "string"
-      }
-      engine = {
-        title = "Engine"
-        type  = "string"
-      }
-      engine_version = {
-        title = "Engine Version"
-        type  = "string"
-      }
-      status = {
-        title = "Status"
-        type  = "string"
-      }
-      instance_class = {
-        title = "Instance Class"
-        type  = "string"
-      }
-      region = {
-        title = "Region"
-        type  = "string"
-      }
-      availability_zone = {
-        title = "Availability Zone"
-        type  = "string"
-      }
-      endpoint = {
-        title = "Endpoint"
-        type  = "string"
-      }
-      tags = {
-        title = "Tags"
-        type  = "object"
-      }
+
+  properties = {
+    string_props = {
+      db_instance_identifier = { title = "DB Instance Identifier", required = true }
+      engine = { title = "Engine", required = true }
+      engine_version = { title = "Engine Version" }
+      status = { title = "Status", required = true }
+      instance_class = { title = "Instance Class" }
+      region = { title = "Region", required = true }
+      availability_zone = { title = "Availability Zone" }
+      endpoint = { title = "Endpoint", required = true }
     }
-    required = ["db_instance_identifier", "engine", "status", "region", "endpoint"]
+    object_props = {
+      tags = { title = "Tags" }
+    }
   }
 }
 
@@ -163,38 +97,22 @@ resource "port_blueprint" "sqs_queue" {
   title      = "SQS Queue"
   icon       = "AWS"
   identifier = "sqs-queue"
-  
-  schema = {
-    properties = {
-      queue_url = {
-        title = "Queue URL"
-        type  = "string"
-      }
-      queue_name = {
-        title = "Queue Name"
-        type  = "string"
-      }
-      region = {
-        title = "Region"
-        type  = "string"
-      }
-      visibility_timeout = {
-        title = "Visibility Timeout"
-        type  = "number"
-      }
-      message_retention_seconds = {
-        title = "Message Retention Seconds"
-        type  = "number"
-      }
-      fifo_queue = {
-        title = "FIFO Queue"
-        type  = "boolean"
-      }
-      tags = {
-        title = "Tags"
-        type  = "object"
-      }
+
+  properties = {
+    string_props = {
+      queue_url = { title = "Queue URL", required = true }
+      queue_name = { title = "Queue Name", required = true }
+      region = { title = "Region", required = true }
     }
-    required = ["queue_url", "queue_name", "region"]
+    number_props = {
+      visibility_timeout = { title = "Visibility Timeout" }
+      message_retention_seconds = { title = "Message Retention Seconds" }
+    }
+    boolean_props = {
+      fifo_queue = { title = "FIFO Queue" }
+    }
+    object_props = {
+      tags = { title = "Tags" }
+    }
   }
 }

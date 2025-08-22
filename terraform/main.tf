@@ -10,7 +10,6 @@ provider "aws" {
 provider "port" {
   client_id = var.port_client_id
   secret    = var.port_client_secret
-  base_url  = "https://api.getport.io"
 }
 
 # Port.io Blueprints for AWS resources
