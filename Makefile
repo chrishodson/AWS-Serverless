@@ -42,10 +42,18 @@ REQUIRED_KEYS := aws_region port_client_id port_client_secret webhook_secret
 
 tfvars:
 	@[ -f "$(TFVARS)" ] || { echo -e "$(RED)Error: $(TFVARS) not found. Copy terraform.tfvars.example -> terraform.tfvars and edit values.$(NC)"; exit 1; }
-	@for k in $(REQUIRED_KEYS); do \
-		grep -Eq "^\s*$$k\s*=\s*\"(?!YOUR_)" "$(TFVARS)" || { echo -e "$(YELLOW)Warning: Key '$$k' missing or looks like a placeholder in $(TFVARS).$(NC)"; }; \
-	done
-	@echo -e "$(GREEN)tfvars present$(NC)"
+	@missing=0; \
+	for k in $(REQUIRED_KEYS); do \
+		val=$$(awk -v k="$$k" 'match($$0, "^[[:space:]]*" k "[[:space:]]*=[[:space:]]*\"([^\"]*)\"", a){print a[1]}' "$(TFVARS)"); \
+		if [ -z "$$val" ]; then \
+			echo -e "$(YELLOW)Warning: Key '$$k' missing in $(TFVARS).$(NC)"; \
+			missing=1; \
+		elif [[ "$$val" =~ ^YOUR_ ]]; then \
+			echo -e "$(YELLOW)Warning: Key '$$k' looks like a placeholder in $(TFVARS).$(NC)"; \
+		fi; \
+	done; \
+	[ $$missing -eq 0 ] || exit 1; \
+	echo -e "$(GREEN)tfvars present$(NC)"
 
 # Build lambda zip (expects driver.py in $(LAMBDA_DIR))
 package: $(LAMBDA_ZIP)
