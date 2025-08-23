@@ -4,17 +4,15 @@
  */
 
 # EC2 Instance Blueprint
-resource "port_blueprint" "ec2_instance" {
+resource "port_blueprint" "ec2Instance" {
   title      = "EC2 Instance"
   icon       = "EC2"
-  identifier = "ec2-instance"
+  identifier = "ec2Instance"
 
   properties = {
     string_props = {
-      instance_id = { title = "Instance ID", required = true }
-      instance_type = { title = "Instance Type", required = true }
-      state = {
-        title = "State"
+      instance_state = {
+        title = "Instance State"
         enum  = ["pending", "running", "shutting-down", "terminated", "stopping", "stopped"]
         enum_colors = {
           pending         = "yellow"
@@ -24,16 +22,19 @@ resource "port_blueprint" "ec2_instance" {
           stopping        = "orange"
           terminated      = "red"
         }
-        required = true
       }
-      region = { title = "Region" }
+      instance_type = { title = "Instance Type" }
       availability_zone = { title = "Availability Zone" }
-      launch_time = { title = "Launch Time", format = "date-time" }
-      image = { title = "Image ID" }
+      public_dns = { title = "Public DNS" }
+      private_dns = { title = "Private DNS" }
       key_name = { title = "Key Name" }
+      image = { title = "Image ID" }
     }
-    object_props = {
-      tags = { title = "Tags" }
+    array_props = {
+      security_group_ids = { title = "Security Group IDs" }
+    }
+    boolean_props = {
+      monitoring = { title = "Monitoring" }
     }
   }
 
@@ -73,21 +74,15 @@ resource "port_blueprint" "s3_bucket" {
 resource "port_blueprint" "rds_instance" {
   title      = "RDS Instance"
   icon       = "AmazonRDS"
-  identifier = "rds-instance"
+  identifier = "rds_instance"
 
   properties = {
     string_props = {
-      db_instance_identifier = { title = "DB Instance Identifier", required = true }
-      engine = { title = "Engine", required = true }
-      engine_version = { title = "Engine Version" }
-      status = { title = "Status", required = true }
-      instance_class = { title = "Instance Class" }
-      region = { title = "Region", required = true }
-      availability_zone = { title = "Availability Zone" }
-      endpoint = { title = "Endpoint", required = true }
-    }
-    object_props = {
-      tags = { title = "Tags" }
+      instance_identifier = { title = "Instance Identifier" }
+      engine = { title = "Engine" }
+      status = { title = "Status" }
+      region = { title = "Region" }
+      endpoint = { title = "Endpoint" }
     }
   }
 }

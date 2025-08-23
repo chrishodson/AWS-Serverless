@@ -3,8 +3,9 @@
 
 SHELL := /bin/bash
 TF_DIR := terraform
-LAMBDA_DIR := sqs-handler
-LAMBDA_ZIP := $(LAMBDA_DIR)/driver.zip
+SRC_LAMBDA_DIR := sqs-handler
+OUT_LAMBDA_DIR := lambda
+OUT_LAMBDA_ZIP := $(OUT_LAMBDA_DIR)/aws_port_handler.zip
 TFVARS := $(TF_DIR)/terraform.tfvars
 
 # Colors
@@ -20,7 +21,7 @@ all: check package init plan
 help:
 	@echo "Targets:"
 	@echo "  check    - Verify required tools and env are available"
-	@echo "  package  - Build Lambda zip at $(LAMBDA_ZIP)"
+	@echo "  package  - Build Lambda zip at $(OUT_LAMBDA_ZIP)"
 	@echo "  init     - Run terraform init in $(TF_DIR)"
 	@echo "  plan     - Run terraform plan in $(TF_DIR)"
 	@echo "  apply    - Run terraform apply in $(TF_DIR)"
@@ -37,7 +38,7 @@ tools:
 	@echo -e "$(GREEN)Tools OK$(NC)"
 
 # Check required variables file exists and required keys are set
-# Basic grep checks to ensure keys exist and non-placeholder values are provided
+# Basic awk checks to ensure keys exist and non-placeholder values are provided
 REQUIRED_KEYS := aws_region port_client_id port_client_secret webhook_secret
 
 tfvars:
@@ -55,17 +56,18 @@ tfvars:
 	[ $$missing -eq 0 ] || exit 1; \
 	echo -e "$(GREEN)tfvars present$(NC)"
 
-# Build lambda zip (expects driver.py in $(LAMBDA_DIR))
-package: $(LAMBDA_ZIP)
+# Build lambda zip expected by Terraform (uses handler sqs-handler/driver.py)
+package: $(OUT_LAMBDA_ZIP)
 
-$(LAMBDA_ZIP):
-	@mkdir -p $(LAMBDA_DIR)
-	@if [ ! -f "$(LAMBDA_DIR)/driver.py" ]; then \
-		echo -e "$(YELLOW)Note: $(LAMBDA_DIR)/driver.py not found. Creating a minimal handler stub.$(NC)"; \
-		echo 'def lambda_handler(event, context):\n    return {"statusCode": 200, "body": "ok"}' > $(LAMBDA_DIR)/driver.py; \
+$(OUT_LAMBDA_ZIP):
+	@mkdir -p $(OUT_LAMBDA_DIR)
+	@mkdir -p $(SRC_LAMBDA_DIR)
+	@if [ ! -f "$(SRC_LAMBDA_DIR)/driver.py" ]; then \
+		echo -e "$(YELLOW)Note: $(SRC_LAMBDA_DIR)/driver.py not found. Creating a minimal handler stub.$(NC)"; \
+		echo 'def lambda_handler(event, context):\n    return {"statusCode": 200, "body": "ok"}' > $(SRC_LAMBDA_DIR)/driver.py; \
 	fi
-	@cd $(LAMBDA_DIR) && zip -q -r aws_port_handler.zip driver.py
-	@echo -e "$(GREEN)Built $(LAMBDA_ZIP)$(NC)"
+	@cd $(SRC_LAMBDA_DIR) && zip -q $(CURDIR)/$(OUT_LAMBDA_ZIP) driver.py
+	@echo -e "$(GREEN)Built $(OUT_LAMBDA_ZIP)$(NC)"
 
 init:
 	@cd $(TF_DIR) && terraform init
@@ -80,5 +82,5 @@ destroy:
 	@cd $(TF_DIR) && terraform destroy -auto-approve
 
 clean:
-	@rm -f $(LAMBDA_ZIP)
+	@rm -f $(OUT_LAMBDA_ZIP)
 	@echo -e "$(GREEN)Cleaned$(NC)"
