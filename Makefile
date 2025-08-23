@@ -14,9 +14,9 @@ RED=\033[0;31m
 YELLOW=\033[1;33m
 NC=\033[0m
 
-.PHONY: all check tools tfvars lambda package init plan apply destroy clean help
+.PHONY: all check tools tfvars lambda package init plan apply destroy clean help setup
 
-all: check package init plan
+all: setup check package init plan
 
 help:
 	@echo "Targets:"
@@ -27,6 +27,7 @@ help:
 	@echo "  apply    - Run terraform apply in $(TF_DIR)"
 	@echo "  destroy  - Run terraform destroy in $(TF_DIR)"
 	@echo "  clean    - Remove built lambda zip"
+	@echo "  setup    - Configure Terraform plugin cache"
 
 check: tools tfvars
 	@echo -e "$(GREEN)All checks passed.$(NC)"
@@ -72,7 +73,7 @@ $(OUT_LAMBDA_ZIP):
 init:
 	@cd $(TF_DIR) && terraform init
 
-plan:
+plan: package
 	@cd $(TF_DIR) && terraform plan
 
 apply:
@@ -84,3 +85,12 @@ destroy:
 clean:
 	@rm -f $(OUT_LAMBDA_ZIP)
 	@echo -e "$(GREEN)Cleaned$(NC)"
+
+# Setup shared plugin cache for Terraform
+setup:
+	@export TF_PLUGIN_CACHE_DIR="$(HOME)/.terraform.d/plugin-cache"
+	@mkdir -p "$(HOME)/.terraform.d/plugin-cache"
+	@echo "Terraform plugin cache directory set to $(HOME)/.terraform.d/plugin-cache"
+
+# Ensure setup is run before any other target
+default: setup
