@@ -56,3 +56,6 @@ Thumbs.db
 venv
 node_modules
 .sass-cache
+
+# output for lambda
+*.zip
