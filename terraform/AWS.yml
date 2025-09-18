@@ -1,0 +1,143 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Serverless Event-Driven Integration (EventBridge → SQS → Lambda → Webhook)
+
+Parameters:
+  WebhookUrl:
+    Type: String
+    Description: The Port webhook URL
+  WebhookSecret:
+    Type: String
+    NoEcho: true
+    Description: Secret token for Port webhook authentication
+
+Resources:
+  # ---------------------
+  # SQS Queue
+  # ---------------------
+  EventQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: port-event-queue
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 1209600  # 14 days
+
+  # ---------------------
+  # Lambda Execution Role
+  # ---------------------
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+      Policies:
+        - PolicyName: LambdaInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "events:PutEvents"
+                Resource: "*"
+
+  # ---------------------
+  # Lambda Function
+  # ---------------------
+  WebhookLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: port-webhook-forwarder
+      Handler: index.handler
+      Runtime: python3.10
+      Timeout: 60
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          WEBHOOK_URL: !Ref WebhookUrl
+          WEBHOOK_SECRET: !Ref WebhookSecret
+      Code:
+        ZipFile: |
+          import os, json, urllib.request
+
+          def handler(event, context):
+              webhook_url = os.environ["WEBHOOK_URL"]
+              secret = os.environ["WEBHOOK_SECRET"]
+
+              for record in event["Records"]:
+                  body = json.loads(record["body"])
+                  payload = json.dumps(body).encode("utf-8")
+
+                  req = urllib.request.Request(
+                      webhook_url,
+                      data=payload,
+                      headers={
+                          "Content-Type": "application/json",
+                          "Authorization": f"Bearer {secret}"
+                      }
+                  )
+                  try:
+                      with urllib.request.urlopen(req) as resp:
+                          print("Webhook response:", resp.read().decode())
+                  except Exception as e:
+                      print("Error posting to webhook:", e)
+              return {"status": "done"}
+
+  # ---------------------
+  # Lambda Event Source Mapping (SQS → Lambda)
+  # ---------------------
+  LambdaSQSTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt EventQueue.Arn
+      FunctionName: !Ref WebhookLambda
+      BatchSize: 10
+      Enabled: true
+
+  # ---------------------
+  # EventBridge Rule → SQS
+  # ---------------------
+  EventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: port-eventbridge-rule
+      Description: Forward supported AWS events to SQS
+      EventPattern:
+        source:
+          - "aws.ec2"
+          - "aws.s3"
+          - "aws.iam"
+        detail-type:
+          - "AWS API Call via CloudTrail"
+      Targets:
+        - Arn: !GetAtt EventQueue.Arn
+          Id: "SQSTarget"
+
+  EventBridgeToSQSPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref EventQueue
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: SQS:SendMessage
+            Resource: !GetAtt EventQueue.Arn
+
+Outputs:
+  LambdaFunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref WebhookLambda
+  EventQueueName:
+    Description: Name of the SQS queue
+    Value: !GetAtt EventQueue.QueueName
