@@ -1,82 +1,94 @@
 # AWS-Serverless
-AWS integration to port.io that is event driven and serverless
+Event-driven integration that routes AWS events into Port (getport.io) using serverless primitives.
 
-## These terraform scripts will:
+This repository contains Terraform and CloudFormation artefacts, helper scripts, and a Lambda handler that together implement an AWS → Port ingestion pipeline.
 
-### Within Port:
-1. Create a webhook for each AWS type supported
-1. Set up blueprints and mappings for each supported AWS type
+High-level responsibilities
 
-### Within AWS:
-1. Create/validate an SQS queue
-1. Create an EventBridge rule in the AWS account.
-    1. Filter on the supported AWS types
-    1. For all events, put the event into SQS
-1. Create a lambda that reads SQS and put the events into the correct webhook
-    1. Uses env variables for:
-         1. webhook secret
-         1. SQS queue name
-         1. webhook name for each supported service
-1. Create a rule to run the lambda when the SQS queue > 0
+Within Port
+- Create a single ingest webhook (`aws_ingest`) that receives routed events
+- Create blueprints required for AWS resource types
+- Apply mapping rules on the single webhook so each incoming event is translated into the correct blueprint/entity
 
-## Supported AWS types:
-* EC2 instances
-* Current running state of EC2 instances
-* S3 buckets
-* RDS instances
-* SQS queues
+Within AWS
+- Create/validate an SQS queue
+- Create an EventBridge rule that captures AWS events and forwards them to SQS
+- Deploy a Lambda that reads SQS and forwards enriched events to the single Port webhook (`aws_ingest`)
 
-## Shortfalls compared to current Ocean integration:
-* K8s inspection
-* Multi-account support
+Supported AWS resource types
+- EC2 instances (state changes)
+- S3 buckets (events)
+- RDS instances (events)
+- SQS queues (events)
 
-## Improvements/TODO/Open Questions
-* Should it use one webhook vs one per type?
-* Should it use webhooks vs API?
-* What additional AWS types should we support out of the box?
+Shortfalls compared to an Ocean integration
+- No Kubernetes inspection support
+- Single-account by default (no multi-account orchestration provided)
+
+Design notes / decisions
+- Single webhook: this project consolidates events into `aws_ingest` and uses Port-side mapping rules (document-style mappings) to route to blueprints, rather than creating a webhook per AWS type.
+- Mapping automation: because the Terraform Port provider used here does not model webhook mappings, a small idempotent helper script (`utils/create_port_mappings.py`) builds and applies the `mappings` array via the Port API. Terraform triggers this script from `terraform/modules/port_mappings` using a `null_resource` + `local-exec`.
+- CloudFormation vs Terraform: CloudFormation (see `terraform/AWS.yml`) is used in this branch to own certain AWS resources (inline Lambda, roles). Terraform is still used for blueprint & Port provisioning. See `terraform/README.md` and `docs/port_mappings.md` for details.
 
 ---
 
-## Quickstart with Makefile
+## Quickstart
 
-Prereqs:
+Prerequisites
 - Terraform >= 1.0.0 on PATH
-- zip on PATH
-- AWS credentials configured (e.g., via AWS CLI/profile or env vars)
-- Port.io Client ID/Secret
+- zip on PATH (if building a deployment package)
+- AWS credentials configured (CLI/profile or env vars)
+- `PORT_API_TOKEN` — a Port API token (export this in your shell when you want Terraform to apply mappings). Do NOT prefix this token with `Bearer `.
 
-Setup:
-1) Copy and edit variables
-```
+1) Configure Terraform variables
+
+```bash
 cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 # Edit terraform/terraform.tfvars with your real values
 ```
 
-2) Build Lambda package (stub created if you don’t have one yet)
-```
+2) (Optional) Build Lambda zip
+
+The repo contains an inline Lambda inside `terraform/AWS.yml` used by CloudFormation in this branch. If you prefer to deploy a zip with Terraform instead, run:
+
+```bash
 make package
 ```
-This generates `lambda/aws_port_handler.zip` which Terraform expects at `../lambda/aws_port_handler.zip` relative to the `terraform` folder.
 
-3) Initialize and deploy
+The artifact will be created at `lambda/aws_port_handler.zip` and Terraform may reference it depending on how you deploy.
+
+3) Export Port token (if you want Terraform to run mapping creation)
+
+```bash
+export PORT_API_TOKEN="<your-token>"
 ```
+
+4) Initialize and apply
+
+```bash
 make init
 make plan
 make apply
 ```
 
-Other targets:
+Notes
+- You can also run the mapping script manually: `python3 utils/create_port_mappings.py --integration-id aws_ingest --map s3-bucket:mapping-s3-bucket --dry-run` (see `docs/port_mappings.md` for full examples).
+- If you prefer CloudFormation for the Lambda + SQS stack, the file `terraform/AWS.yml` contains an embedded inline Lambda and CloudFormation resources.
+
+Other Make targets
 - `make check`   – validates required tools and tfvars presence
 - `make destroy` – tears down the stack
 - `make clean`   – removes the built lambda zip
 
-Notes:
-- The Lambda handler is configured as `driver.lambda_handler`. If you provide your own code, include `driver.py` and ensure the function name matches.
-- To override webhook URLs (if you already created them), populate the `webhook_urls` map in `terraform/terraform.tfvars`.
-
 ---
 
+## Mappings (Port webhook)
+
+See `docs/port_mappings.md` for the accepted mapping payload shape, examples, and how the idempotent mapping script works. A sample of the applied mapping is saved in `terraform/aws_mapping_applied.json`.
+
 ## Data flow
+
+The pipeline is: EventBridge -> SQS -> Lambda -> Port (single ingest webhook). The per-type routing inside Port is handled by mapping rules on the single `aws_ingest` webhook (the diagram labels are logical per-type mappings rather than separate webhook endpoints).
 
 ```mermaid
 flowchart LR
@@ -94,21 +106,30 @@ flowchart LR
   end
 
   subgraph Port
-    PWH_EC2[Port Webhook - EC2]
-    PWH_S3[Port Webhook - S3]
-    PWH_RDS[Port Webhook - RDS]
-    PWH_SQS[Port Webhook - SQS]
+    PWH_LOGICAL[Port Webhook - aws_ingest (logical per-type mappings)]
   end
 
   EC2 -->|Rule: EC2 state-change| EB
-  EB -->|Target: API Destination| PWH_EC2
-
   S3 --> EB
   RDS --> EB
   SQSRes --> EB
   EB -->|Target: SQS| Q
   Q -->|Trigger| L
-  L -->|Route by type| PWH_S3
-  L -->|Route by type| PWH_RDS
-  L -->|Route by type| PWH_SQS
+  L -->|POST to| PWH_LOGICAL
 ```
+
+---
+
+## Troubleshooting and tips
+
+- Authentication issues: ensure `PORT_API_TOKEN` is exported (do not prefix with `Bearer `). The mapping script and verification curl commands assume this token is present in the environment.
+- Dry-run first: run the mapping script with `--dry-run` to see the payload before it is PATCHed.
+- If Terraform `null_resource` doesn't run the script, check that `${path.root}/../utils/create_port_mappings.py` resolves to the script location (module working directory) and that the environment variable is present where `terraform apply` runs.
+
+---
+
+If you'd like, I can:
+- Add a one-shot `scripts/smoke_test.sh` that posts a sample event to the ingest URL (dry-run vs live), or
+- Add a small integration test harness under `tests/` that exercises the mapping script (dry-run) and validates JSON shape.
+
+Which would you prefer?

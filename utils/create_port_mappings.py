@@ -21,21 +21,49 @@ def get_env_token():
 
 
 def api_get(base, path, token):
-    req = request.Request(base + path)
+    # Try the provided token first; if we receive 401, retry with 'Bearer ' prefix
+    url = base + path
+    req = request.Request(url)
     req.add_header('Authorization', token)
-    with request.urlopen(req) as resp:
-        return json.load(resp)
+    try:
+        with request.urlopen(req) as resp:
+            return json.load(resp)
+    except error.HTTPError as e:
+        if e.code == 401 and not token.lower().startswith('bearer '):
+            # Retry with Bearer prefix
+            req2 = request.Request(url)
+            req2.add_header('Authorization', f'Bearer {token}')
+            try:
+                with request.urlopen(req2) as resp:
+                    return json.load(resp)
+            except error.HTTPError:
+                # Re-raise original for clarity
+                raise
+        raise
 
 
 def api_patch(base, path, token, payload):
     data = json.dumps(payload).encode('utf-8')
-    req = request.Request(base + path, data=data, method='PATCH')
+    url = base + path
+    req = request.Request(url, data=data, method='PATCH')
     req.add_header('Authorization', token)
     req.add_header('Content-Type', 'application/json')
     try:
         with request.urlopen(req) as resp:
             return json.load(resp)
     except error.HTTPError as e:
+        # If unauthorized, retry with Bearer prefix if not already present
+        if e.code == 401 and not token.lower().startswith('bearer '):
+            req2 = request.Request(url, data=data, method='PATCH')
+            req2.add_header('Authorization', f'Bearer {token}')
+            req2.add_header('Content-Type', 'application/json')
+            try:
+                with request.urlopen(req2) as resp:
+                    return json.load(resp)
+            except error.HTTPError as e2:
+                body = e2.read().decode('utf-8')
+                print(f"HTTP {e2.code}: {body}", file=sys.stderr)
+                raise
         body = e.read().decode('utf-8')
         print(f"HTTP {e.code}: {body}", file=sys.stderr)
         raise
@@ -44,6 +72,31 @@ def api_patch(base, path, token, payload):
 def build_mapping(blueprint_identifier, mapping_name):
     # mapping_name is a simple identifier used for the mapped entity
     # Build a doc-style mapping accepted by the Port webhook API
+    # Known property mappings per blueprint (align with terraform/module port_blueprints)
+    per_blueprint_props = {
+        's3-bucket': [
+            'bucket_name', 'creation_date', 'region', 'acl', 'versioning_enabled'
+        ],
+        'ec2-instance': [
+            'instance_state', 'instance_type', 'availability_zone', 'public_dns', 'private_dns'
+        ],
+        'rds-instance': [
+            'instance_identifier', 'engine', 'status', 'endpoint'
+        ],
+        'sqs-queue': [
+            'queue_name', 'queue_url', 'visibility_timeout', 'message_retention_seconds', 'fifo_queue', 'region'
+        ],
+    }
+
+    props = {}
+    keys = per_blueprint_props.get(blueprint_identifier, [])
+    if keys:
+        for k in keys:
+            props[k] = f'.body.properties.{k}'
+    else:
+        # Fallback: include the entire properties object under a single key if blueprint unknown
+        props = {'raw': '.body.properties'}
+
     return {
         "blueprint": blueprint_identifier,
         "operation": "create",
@@ -51,9 +104,7 @@ def build_mapping(blueprint_identifier, mapping_name):
         "entity": {
             "identifier": f'"{mapping_name}"',
             "title": f'"Mapped {blueprint_identifier}"',
-            "properties": {
-                "raw": ".body.properties"
-            }
+            "properties": props
         }
     }
 
