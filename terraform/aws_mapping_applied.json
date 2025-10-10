@@ -1,0 +1,86 @@
+{
+  "ok": true,
+  "integration": {
+    "_id": "68e1c9e30983a3d9554d26d2",
+    "webhookKey": "9pnWvfytlJ5bPwWo",
+    "identifier": "aws_ingest",
+    "title": "AWS Ingest",
+    "icon": "AWS",
+    "description": "Single webhook to ingest all AWS events and forward to Port blueprints",
+    "enabled": true,
+    "security": {},
+    "createdBy": "RebNhJM3KWEQgEIaWOyg278aq3XUCVyJ",
+    "updatedBy": "RebNhJM3KWEQgEIaWOyg278aq3XUCVyJ",
+    "updatedAt": "2025-10-10T01:57:57.894Z",
+    "integrationType": "custom",
+    "mappings": [
+      {
+        "blueprint": "s3-bucket",
+        "operation": "create",
+        "filter": ".body.blueprint == \"s3-bucket\"",
+        "entity": {
+          "identifier": "\"mapping-s3-bucket\"",
+          "title": "\"S3 mapped\"",
+          "properties": {
+            "bucket_name": ".body.properties.bucket_name",
+            "creation_date": ".body.properties.creation_date",
+            "region": ".body.properties.region",
+            "acl": ".body.properties.acl",
+            "versioning_enabled": ".body.properties.versioning_enabled"
+          }
+        }
+      },
+      {
+        "blueprint": "ec2-instance",
+        "operation": "create",
+        "filter": ".body.blueprint == \"ec2-instance\"",
+        "entity": {
+          "identifier": "\"mapping-ec2-instance\"",
+          "title": "\"EC2 mapped\"",
+          "properties": {
+            "instance_state": ".body.properties.instance_state",
+            "instance_type": ".body.properties.instance_type",
+            "availability_zone": ".body.properties.availability_zone",
+            "public_dns": ".body.properties.public_dns",
+            "private_dns": ".body.properties.private_dns"
+          }
+        }
+      },
+      {
+        "blueprint": "rds-instance",
+        "operation": "create",
+        "filter": ".body.blueprint == \"rds-instance\"",
+        "entity": {
+          "identifier": "\"mapping-rds-instance\"",
+          "title": "\"RDS mapped\"",
+          "properties": {
+            "instance_identifier": ".body.properties.instance_identifier",
+            "engine": ".body.properties.engine",
+            "status": ".body.properties.status",
+            "endpoint": ".body.properties.endpoint"
+          }
+        }
+      },
+      {
+        "blueprint": "sqs-queue",
+        "operation": "create",
+        "filter": ".body.blueprint == \"sqs-queue\"",
+        "entity": {
+          "identifier": "\"mapping-sqs-queue\"",
+          "title": "\"SQS mapped\"",
+          "properties": {
+            "queue_name": ".body.properties.queue_name",
+            "queue_url": ".body.properties.queue_url",
+            "visibility_timeout": ".body.properties.visibility_timeout",
+            "message_retention_seconds": ".body.properties.message_retention_seconds",
+            "fifo_queue": ".body.properties.fifo_queue",
+            "region": ".body.properties.region"
+          }
+        }
+      }
+    ],
+    "createdAt": "2025-10-05T01:29:07.096Z",
+    "url": "https://ingest.getport.io/9pnWvfytlJ5bPwWo",
+    "events": []
+  }
+}

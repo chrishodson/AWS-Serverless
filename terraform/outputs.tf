@@ -3,23 +3,13 @@
  * outputs.tf - Output values
  */
 
-output "port_webhook_urls" {
-  description = "URLs for Port.io webhooks"
-  value       = module.port_webhooks.webhook_urls
+output "port_webhook_url" {
+  description = "URL for Port.io AWS ingest webhook"
+  value       = module.port_webhooks.webhook_url
   sensitive   = true
 }
 
-output "sqs_queue_url" {
-  description = "URL of the SQS queue"
-  value       = module.aws_resources.sqs_queue_url
-}
-
-output "lambda_function_arn" {
-  description = "ARN of the Lambda function"
-  value       = module.aws_lambda.lambda_arn
-}
-
-output "event_bridge_arn" {
-  description = "ARN of the EventBridge"
-  value       = module.aws_resources.event_bridge_arn
-}
+# The AWS resources (SQS, Lambda, EventBridge) are managed via the
+# CloudFormation template `terraform/AWS.yml`. If you need the ARNs/URLs
+# exposed as Terraform outputs, enable them by importing the CloudFormation
+# stack outputs or re-creating corresponding Terraform data resources.

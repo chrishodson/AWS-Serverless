@@ -7,7 +7,7 @@
 resource "port_blueprint" "ec2Instance" {
   title      = "EC2 Instance"
   icon       = "EC2"
-  identifier = "ec2Instance"
+  identifier = "ec2-instance"
 
   properties = {
     string_props = {
@@ -74,7 +74,7 @@ resource "port_blueprint" "s3_bucket" {
 resource "port_blueprint" "rds_instance" {
   title      = "RDS Instance"
   icon       = "AmazonRDS"
-  identifier = "rds_instance"
+  identifier = "rds-instance"
 
   properties = {
     string_props = {

@@ -1,0 +1,231 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Serverless Event-Driven Integration (EventBridge → SQS → Lambda → Webhook)
+
+Parameters:
+  WebhookUrl:
+    Type: String
+    Description: The Port webhook URL
+  WebhookSecret:
+    Type: String
+    NoEcho: true
+    Description: Secret token for Port webhook authentication
+
+Resources:
+  # ---------------------
+  # SQS Queue
+  # ---------------------
+  EventQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: port-event-queue
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 1209600  # 14 days
+
+  # ---------------------
+  # Lambda Execution Role
+  # ---------------------
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+      Policies:
+        - PolicyName: LambdaInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "events:PutEvents"
+                Resource: "*"
+
+  # ---------------------
+  # Lambda Function
+  # ---------------------
+  WebhookLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: port-webhook-forwarder
+      Handler: index.handler
+      Runtime: python3.10
+      Timeout: 60
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          WEBHOOK_URL: !Ref WebhookUrl
+          WEBHOOK_SECRET: !Ref WebhookSecret
+      Code:
+        ZipFile: |
+          import os
+          import json
+          import hmac
+          import hashlib
+          import http.client
+          import urllib.request
+          from urllib.parse import urlparse
+
+          WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
+          WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
+
+          def transform_event(body):
+            source = body.get('source')
+            detail = body.get('detail', {})
+            region = body.get('region') or detail.get('awsRegion') or body.get('awsRegion')
+            timestamp = body.get('time')
+            base = {
+              'origin': 'AWS',
+              'timestamp': timestamp,
+              'region': region,
+              'action': 'upsert'
+            }
+            if source == 'aws.ec2':
+              bp = dict(base)
+              bp['blueprint'] = 'ec2-instance'
+              props = {
+                'instance_state': detail.get('state') or detail.get('status'),
+                'instance_type': detail.get('instanceType') or detail.get('instance_type'),
+                'availability_zone': (detail.get('placement') or {}).get('availabilityZone') if isinstance(detail.get('placement'), dict) else detail.get('availabilityZone'),
+                'public_dns': detail.get('publicDnsName'),
+                'private_dns': detail.get('privateDnsName')
+              }
+              bp['properties'] = {k: v for k, v in props.items() if v is not None}
+              return bp
+            if source == 'aws.s3':
+              bp = dict(base)
+              bp['blueprint'] = 's3-bucket'
+              props = {
+                'bucket_name': detail.get('bucketName') or (detail.get('requestParameters') or {}).get('bucketName') or (detail.get('bucket') or {}).get('name'),
+                'creation_date': detail.get('creationTime') or timestamp,
+                'region': region,
+                'acl': detail.get('acl')
+              }
+              bp['properties'] = {k: v for k, v in props.items() if v is not None}
+              return bp
+            if source == 'aws.rds':
+              bp = dict(base)
+              bp['blueprint'] = 'rds-instance'
+              props = {
+                'instance_identifier': detail.get('instanceId') or detail.get('dbInstanceIdentifier') or detail.get('DBInstanceIdentifier'),
+                'status': detail.get('state') or detail.get('status'),
+                'engine': detail.get('engine') or detail.get('engineName'),
+                'endpoint': (detail.get('endpoint') or {}).get('address') if isinstance(detail.get('endpoint'), dict) else detail.get('endpoint'),
+                'region': region
+              }
+              bp['properties'] = {k: v for k, v in props.items() if v is not None}
+              return bp
+            if source == 'aws.sqs':
+              bp = dict(base)
+              bp['blueprint'] = 'sqs-queue'
+              queue_name = detail.get('queueName') or detail.get('queue') or detail.get('name')
+              account = body.get('account') or body.get('accountId') or detail.get('ownerAccountId') or detail.get('awsAccountId')
+              queue_url = None
+              if queue_name and region and account:
+                queue_url = f"https://sqs.{region}.amazonaws.com/{account}/{queue_name}"
+              props = {
+                'queue_name': queue_name,
+                'queue_url': queue_url,
+                'region': region
+              }
+              bp['properties'] = {k: v for k, v in props.items() if v is not None}
+              return bp
+            bp = dict(base)
+            bp['blueprint'] = 'cloudResource'
+            bp['properties'] = {'kind': source, 'region': region, 'raw': detail}
+            return bp
+
+          def sign_payload(secret, body):
+            return hmac.new(secret.encode('utf-8'), body.encode('utf-8'), hashlib.sha256).hexdigest()
+
+          def send_to_port_webhook(webhook_url, event):
+            body = json.dumps(event)
+            signature = sign_payload(WEBHOOK_SECRET, body)
+            parsed = urlparse(webhook_url)
+            conn = http.client.HTTPSConnection(parsed.hostname, 443)
+            headers = {'Content-Type': 'application/json', 'X-Port-Signature': signature}
+            try:
+              conn.request('POST', parsed.path or '/', body, headers)
+              resp = conn.getresponse()
+              resp_body = resp.read().decode()
+              if 200 <= resp.status < 300:
+                return {'status': resp.status, 'body': resp_body}
+              else:
+                raise Exception(f'HTTP {resp.status}: {resp_body}')
+            finally:
+              conn.close()
+
+          def handler(event, context):
+            webhook_url = os.environ.get('WEBHOOK_URL')
+            for record in event.get('Records', []):
+              try:
+                body = json.loads(record.get('body', '{}'))
+                port_event = transform_event(body)
+                if not port_event:
+                  print('Skipping record: unsupported source', body.get('source'))
+                  continue
+                result = send_to_port_webhook(webhook_url, port_event)
+                print('Sent event', result)
+              except Exception as e:
+                print('Error processing record:', e)
+            return {'status': 'done'}
+
+  # ---------------------
+  # Lambda Event Source Mapping (SQS → Lambda)
+  # ---------------------
+  LambdaSQSTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt EventQueue.Arn
+      FunctionName: !Ref WebhookLambda
+      BatchSize: 10
+      Enabled: true
+
+  # ---------------------
+  # EventBridge Rule → SQS
+  # ---------------------
+  EventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: port-eventbridge-rule
+      Description: Forward supported AWS events to SQS
+      EventPattern:
+        source:
+          - "aws.s3"
+          - "aws.ec2"
+          - "aws.rds"
+          - "aws.sqs"
+        detail-type:
+          - "AWS API Call via CloudTrail"
+      Targets:
+        - Arn: !GetAtt EventQueue.Arn
+          Id: "SQSTarget"
+
+  EventBridgeToSQSPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref EventQueue
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: SQS:SendMessage
+            Resource: !GetAtt EventQueue.Arn
+
+Outputs:
+  LambdaFunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref WebhookLambda
+  EventQueueName:
+    Description: Name of the SQS queue
+    Value: !GetAtt EventQueue.QueueName
