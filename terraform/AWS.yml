@@ -65,122 +65,117 @@ Resources:
           WEBHOOK_SECRET: !Ref WebhookSecret
       Code:
         ZipFile: |
-      import os, json, urllib.request
-      from urllib.parse import urlparse
+          import os
+          import json
+          import hmac
+          import hashlib
+          import http.client
+          import urllib.request
+          from urllib.parse import urlparse
 
-      def transform_event(body):
-        """Convert an AWS EventBridge/SQS body into a Port blueprint event.
-        This maps source -> blueprint identifier and normalizes property names
-        to match the Terraform `port_blueprints` module.
-        """
-        source = body.get('source')
-        detail = body.get('detail', {})
-        region = body.get('region') or detail.get('awsRegion') or body.get('awsRegion')
-        timestamp = body.get('time')
+          WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
+          WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
 
-        base = {
-          'origin': 'AWS',
-          'timestamp': timestamp,
-          'region': region,
-          'action': 'upsert'
-        }
-
-        # EC2 -> blueprint identifier in Terraform is "ec2-instance"
-        if source == 'aws.ec2':
-          bp = dict(base)
-          bp['blueprint'] = 'ec2-instance'
-          props = {
-            'instance_id': detail.get('instanceId') or detail.get('instance-id'),
-            'instance_identifier': detail.get('instanceId') or detail.get('instance-id'),
-            'instance_state': detail.get('state') or detail.get('status'),
-            'instance_type': detail.get('instanceType') or detail.get('instance_type'),
-            'availability_zone': (detail.get('placement') or {}).get('availabilityZone') if isinstance(detail.get('placement'), dict) else detail.get('availabilityZone'),
-            'public_dns': detail.get('publicDnsName'),
-            'private_dns': detail.get('privateDnsName'),
-            'key_name': detail.get('keyName'),
-            'image': detail.get('imageId') or detail.get('amiId')
-          }
-          bp['properties'] = {k: v for k, v in props.items() if v is not None}
-          return bp
-
-              # S3 -> blueprint identifier is "s3-bucket"
-        if source == 'aws.s3':
-          bp = dict(base)
-          bp['blueprint'] = 's3-bucket'
-          props = {
-            'bucket_name': detail.get('bucketName') or (detail.get('requestParameters') or {}).get('bucketName') or detail.get('bucket', {}).get('name'),
-            'creation_date': detail.get('creationTime') or timestamp,
-            'region': region,
-            'acl': detail.get('acl')
-          }
-          bp['properties'] = {k: v for k, v in props.items() if v is not None}
-          return bp
-
-        # RDS -> blueprint identifier is "rds-instance"
-        if source == 'aws.rds':
-          bp = dict(base)
-          bp['blueprint'] = 'rds-instance'
-          props = {
-            'instance_identifier': detail.get('instanceId') or detail.get('dbInstanceIdentifier') or detail.get('DBInstanceIdentifier'),
-            'status': detail.get('state') or detail.get('status'),
-            'engine': detail.get('engine') or detail.get('engineName'),
-            'endpoint': (detail.get('endpoint') or {}).get('address') if isinstance(detail.get('endpoint'), dict) else detail.get('endpoint'),
-            'region': region
-          }
-          bp['properties'] = {k: v for k, v in props.items() if v is not None}
-          return bp
-
-        # SQS -> blueprint identifier is "sqs-queue"
-        if source == 'aws.sqs':
-          bp = dict(base)
-          bp['blueprint'] = 'sqs-queue'
-          queue_name = detail.get('queueName') or detail.get('queue') or detail.get('name')
-          account = body.get('account') or body.get('accountId') or detail.get('ownerAccountId') or detail.get('awsAccountId')
-          queue_url = None
-          if queue_name and region and account:
-            # best-effort construction of a queue URL
-            queue_url = f"https://sqs.{region}.amazonaws.com/{account}/{queue_name}"
-          props = {
-            'queue_name': queue_name,
-            'queue_url': queue_url,
-            'region': region
-          }
-          bp['properties'] = {k: v for k, v in props.items() if v is not None}
-          return bp
-
-        # Unknown/unsupported source -> return None
-        return None
-
-
-      def handler(event, context):
-        webhook_url = os.environ["WEBHOOK_URL"]
-        secret = os.environ["WEBHOOK_SECRET"]
-
-        for record in event.get("Records", []):
-          try:
-            body = json.loads(record.get("body", "{}"))
-            port_event = transform_event(body)
-            if not port_event:
-              print("Skipping record: unsupported source or unable to transform", body.get('source'))
-              continue
-
-            payload = json.dumps(port_event).encode("utf-8")
-            req = urllib.request.Request(
-              webhook_url,
-              data=payload,
-              headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {secret}"
+          def transform_event(body):
+            source = body.get('source')
+            detail = body.get('detail', {})
+            region = body.get('region') or detail.get('awsRegion') or body.get('awsRegion')
+            timestamp = body.get('time')
+            base = {
+              'origin': 'AWS',
+              'timestamp': timestamp,
+              'region': region,
+              'action': 'upsert'
+            }
+            if source == 'aws.ec2':
+              bp = dict(base)
+              bp['blueprint'] = 'ec2-instance'
+              props = {
+                'instance_state': detail.get('state') or detail.get('status'),
+                'instance_type': detail.get('instanceType') or detail.get('instance_type'),
+                'availability_zone': (detail.get('placement') or {}).get('availabilityZone') if isinstance(detail.get('placement'), dict) else detail.get('availabilityZone'),
+                'public_dns': detail.get('publicDnsName'),
+                'private_dns': detail.get('privateDnsName')
               }
-            )
+              bp['properties'] = {k: v for k, v in props.items() if v is not None}
+              return bp
+            if source == 'aws.s3':
+              bp = dict(base)
+              bp['blueprint'] = 's3-bucket'
+              props = {
+                'bucket_name': detail.get('bucketName') or (detail.get('requestParameters') or {}).get('bucketName') or (detail.get('bucket') or {}).get('name'),
+                'creation_date': detail.get('creationTime') or timestamp,
+                'region': region,
+                'acl': detail.get('acl')
+              }
+              bp['properties'] = {k: v for k, v in props.items() if v is not None}
+              return bp
+            if source == 'aws.rds':
+              bp = dict(base)
+              bp['blueprint'] = 'rds-instance'
+              props = {
+                'instance_identifier': detail.get('instanceId') or detail.get('dbInstanceIdentifier') or detail.get('DBInstanceIdentifier'),
+                'status': detail.get('state') or detail.get('status'),
+                'engine': detail.get('engine') or detail.get('engineName'),
+                'endpoint': (detail.get('endpoint') or {}).get('address') if isinstance(detail.get('endpoint'), dict) else detail.get('endpoint'),
+                'region': region
+              }
+              bp['properties'] = {k: v for k, v in props.items() if v is not None}
+              return bp
+            if source == 'aws.sqs':
+              bp = dict(base)
+              bp['blueprint'] = 'sqs-queue'
+              queue_name = detail.get('queueName') or detail.get('queue') or detail.get('name')
+              account = body.get('account') or body.get('accountId') or detail.get('ownerAccountId') or detail.get('awsAccountId')
+              queue_url = None
+              if queue_name and region and account:
+                queue_url = f"https://sqs.{region}.amazonaws.com/{account}/{queue_name}"
+              props = {
+                'queue_name': queue_name,
+                'queue_url': queue_url,
+                'region': region
+              }
+              bp['properties'] = {k: v for k, v in props.items() if v is not None}
+              return bp
+            bp = dict(base)
+            bp['blueprint'] = 'cloudResource'
+            bp['properties'] = {'kind': source, 'region': region, 'raw': detail}
+            return bp
+
+          def sign_payload(secret, body):
+            return hmac.new(secret.encode('utf-8'), body.encode('utf-8'), hashlib.sha256).hexdigest()
+
+          def send_to_port_webhook(webhook_url, event):
+            body = json.dumps(event)
+            signature = sign_payload(WEBHOOK_SECRET, body)
+            parsed = urlparse(webhook_url)
+            conn = http.client.HTTPSConnection(parsed.hostname, 443)
+            headers = {'Content-Type': 'application/json', 'X-Port-Signature': signature}
             try:
-              with urllib.request.urlopen(req) as resp:
-                print("Webhook response:", resp.read().decode())
-            except Exception as e:
-              print("Error posting to webhook:", e)
-          except Exception as e:
-            print("Error processing record:", e)
-        return {"status": "done"}
+              conn.request('POST', parsed.path or '/', body, headers)
+              resp = conn.getresponse()
+              resp_body = resp.read().decode()
+              if 200 <= resp.status < 300:
+                return {'status': resp.status, 'body': resp_body}
+              else:
+                raise Exception(f'HTTP {resp.status}: {resp_body}')
+            finally:
+              conn.close()
+
+          def handler(event, context):
+            webhook_url = os.environ.get('WEBHOOK_URL')
+            for record in event.get('Records', []):
+              try:
+                body = json.loads(record.get('body', '{}'))
+                port_event = transform_event(body)
+                if not port_event:
+                  print('Skipping record: unsupported source', body.get('source'))
+                  continue
+                result = send_to_port_webhook(webhook_url, port_event)
+                print('Sent event', result)
+              except Exception as e:
+                print('Error processing record:', e)
+            return {'status': 'done'}
 
   # ---------------------
   # Lambda Event Source Mapping (SQS → Lambda)
