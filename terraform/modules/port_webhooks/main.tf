@@ -3,38 +3,15 @@
  * main.tf - Creates webhooks for AWS resources
  */
 
-# Create webhook for EC2 events
-resource "port_webhook" "ec2_webhook" {
-  title       = "AWS EC2 Events"
-  identifier  = "aws-ec2-events"
-  description = "Webhook for AWS EC2 instance events"
-  icon        = "AWS"
-  enabled     = true
-}
+/* Single webhook for all AWS events (ingest)
+   We intentionally create one webhook (aws_ingest) which receives all AWS events
+   and the Lambda/EventBridge/SQS processing will route events to the right
+   blueprint within Port. This avoids managing multiple webhook resources. */
 
-# Create webhook for S3 events
-resource "port_webhook" "s3_webhook" {
-  title       = "AWS S3 Events"
-  identifier  = "aws-s3-events"
-  description = "Webhook for AWS S3 bucket events"
-  icon        = "AWS"
-  enabled     = true
-}
-
-# Create webhook for RDS events
-resource "port_webhook" "rds_webhook" {
-  title       = "AWS RDS Events"
-  identifier  = "aws-rds-events"
-  description = "Webhook for AWS RDS instance events"
-  icon        = "AWS"
-  enabled     = true
-}
-
-# Create webhook for SQS events
-resource "port_webhook" "sqs_webhook" {
-  title       = "AWS SQS Events"
-  identifier  = "aws-sqs-events"
-  description = "Webhook for AWS SQS queue events"
+resource "port_webhook" "aws_ingest" {
+  title       = "AWS Ingest"
+  identifier  = "aws_ingest"
+  description = "Single webhook to ingest all AWS events and forward to Port blueprints"
   icon        = "AWS"
   enabled     = true
 }

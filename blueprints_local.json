@@ -1,0 +1,194 @@
+{
+  "ec2-instance": {
+    "resource_name": "ec2Instance",
+    "properties": {
+      "properties": {
+        "group": "properties",
+        "required": false
+      },
+      "string_props": {
+        "group": "string_props",
+        "required": false
+      },
+      "instance_state": {
+        "group": "instance_state",
+        "required": false
+      },
+      "enum_colors": {
+        "group": "enum_colors",
+        "required": false
+      },
+      "instance_type": {
+        "group": "instance_type",
+        "required": false
+      },
+      "availability_zone": {
+        "group": "availability_zone",
+        "required": false
+      },
+      "public_dns": {
+        "group": "public_dns",
+        "required": false
+      },
+      "private_dns": {
+        "group": "private_dns",
+        "required": false
+      },
+      "key_name": {
+        "group": "key_name",
+        "required": false
+      },
+      "image": {
+        "group": "image",
+        "required": false
+      },
+      "array_props": {
+        "group": "array_props",
+        "required": false
+      },
+      "security_group_ids": {
+        "group": "security_group_ids",
+        "required": false
+      },
+      "boolean_props": {
+        "group": "boolean_props",
+        "required": false
+      },
+      "monitoring": {
+        "group": "monitoring",
+        "required": false
+      }
+    }
+  },
+  "s3-bucket": {
+    "resource_name": "s3_bucket",
+    "properties": {
+      "properties": {
+        "group": "properties",
+        "required": true
+      },
+      "string_props": {
+        "group": "string_props",
+        "required": true
+      },
+      "bucket_name": {
+        "group": "bucket_name",
+        "required": true
+      },
+      "creation_date": {
+        "group": "creation_date",
+        "required": true
+      },
+      "region": {
+        "group": "region",
+        "required": true
+      },
+      "acl": {
+        "group": "acl",
+        "required": false
+      },
+      "boolean_props": {
+        "group": "boolean_props",
+        "required": false
+      },
+      "versioning_enabled": {
+        "group": "versioning_enabled",
+        "required": false
+      },
+      "object_props": {
+        "group": "object_props",
+        "required": false
+      },
+      "tags": {
+        "group": "tags",
+        "required": false
+      }
+    }
+  },
+  "rds-instance": {
+    "resource_name": "rds_instance",
+    "properties": {
+      "properties": {
+        "group": "properties",
+        "required": false
+      },
+      "string_props": {
+        "group": "string_props",
+        "required": false
+      },
+      "instance_identifier": {
+        "group": "instance_identifier",
+        "required": false
+      },
+      "engine": {
+        "group": "engine",
+        "required": false
+      },
+      "status": {
+        "group": "status",
+        "required": false
+      },
+      "region": {
+        "group": "region",
+        "required": false
+      },
+      "endpoint": {
+        "group": "endpoint",
+        "required": false
+      }
+    }
+  },
+  "sqs-queue": {
+    "resource_name": "sqs_queue",
+    "properties": {
+      "properties": {
+        "group": "properties",
+        "required": true
+      },
+      "string_props": {
+        "group": "string_props",
+        "required": true
+      },
+      "queue_url": {
+        "group": "queue_url",
+        "required": true
+      },
+      "queue_name": {
+        "group": "queue_name",
+        "required": true
+      },
+      "region": {
+        "group": "region",
+        "required": true
+      },
+      "number_props": {
+        "group": "number_props",
+        "required": false
+      },
+      "visibility_timeout": {
+        "group": "visibility_timeout",
+        "required": false
+      },
+      "message_retention_seconds": {
+        "group": "message_retention_seconds",
+        "required": false
+      },
+      "boolean_props": {
+        "group": "boolean_props",
+        "required": false
+      },
+      "fifo_queue": {
+        "group": "fifo_queue",
+        "required": false
+      },
+      "object_props": {
+        "group": "object_props",
+        "required": false
+      },
+      "tags": {
+        "group": "tags",
+        "required": false
+      }
+    }
+  }
+}

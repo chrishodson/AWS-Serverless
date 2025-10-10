@@ -35,6 +35,8 @@ variable "webhook_urls" {
   sensitive   = true
 }
 
+// Backwards-compatibility: if a single webhook URL is provided, modules can read var.webhook_urls["ingest"]
+
 variable "lambda_execution_role" {
   description = "Name of the Lambda execution role"
   type        = string

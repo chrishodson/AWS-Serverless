@@ -57,6 +57,24 @@ terraform/
    terraform apply
    ```
 
+## Combined deploy script
+
+This repository includes a helper script `deploy_cf_and_tf.sh` that will:
+
+- Run Terraform (Port blueprints and webhooks)
+- Read the Port webhook URL from Terraform outputs
+- Deploy the CloudFormation template `AWS.yml` with the webhook URL and secret
+
+Usage:
+
+```bash
+cd /workspaces/AWS-Serverless/terraform
+chmod +x deploy_cf_and_tf.sh
+./deploy_cf_and_tf.sh terraform.tfvars
+```
+
+Note: the script expects `jq` and `aws` CLI to be installed and configured.
+
 ## Functionality
 
 These Terraform scripts will:

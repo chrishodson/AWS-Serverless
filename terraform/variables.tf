@@ -33,6 +33,13 @@ variable "webhook_urls" {
   default     = {}
 }
 
+variable "port_api_token" {
+  description = "Port API bearer token used by provisioning scripts"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "sqs_queue_name" {
   description = "Name of the SQS queue for event processing"
   type        = string
