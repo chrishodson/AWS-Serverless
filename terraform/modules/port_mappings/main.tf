@@ -17,10 +17,10 @@ resource "null_resource" "create_mappings" {
   }
 
   provisioner "local-exec" {
-  # Use the repository scripts directory (one level above the terraform directory)
-  # path.root is the terraform root, so ../scripts points to the repository scripts/ folder
+  # Use the repository utils directory (one level above the terraform directory)
+  # path.root is the terraform root, so ../utils points to the repository utils/ folder
     command = <<-EOT
-      python3 ${path.root}/../scripts/create_port_mappings.py --integration-id ${var.integration_id} $(for m in ${join(" ", var.mappings)}; do echo --map $m; done)
+      python3 ${path.root}/../utils/create_port_mappings.py --integration-id ${var.integration_id} $(for m in ${join(" ", var.mappings)}; do echo --map $m; done)
     EOT
     # Do not set PORT_API_TOKEN here so the provisioner inherits the caller's environment
     # (this allows users to provide the token via their shell). Provide PORT_API_BASE too.
