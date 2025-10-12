@@ -57,6 +57,24 @@ terraform/
    terraform apply
    ```
 
+## Combined deploy script
+
+This repository includes a helper script `deploy_cf_and_tf.sh` that will:
+
+- Run Terraform (Port blueprints and webhooks)
+- Read the Port webhook URL from Terraform outputs
+- Deploy the CloudFormation template `AWS.yml` with the webhook URL and secret
+
+Usage:
+
+```bash
+cd /workspaces/AWS-Serverless/terraform
+chmod +x deploy_cf_and_tf.sh
+./deploy_cf_and_tf.sh terraform.tfvars
+```
+
+Note: the script expects `jq` and `aws` CLI to be installed and configured.
+
 ## Functionality
 
 These Terraform scripts will:
@@ -76,3 +94,21 @@ These Terraform scripts will:
 - S3 buckets
 - RDS instances
 - SQS queues
+
+## Port mapping helper scripts (utils/)
+
+This repo now contains helper scripts under the top-level `utils/` directory. They are used by the Terraform `port_mappings` module to create idempotent webhook mappings in Port.
+
+- `utils/create_port_mappings.py` - builds a document-style mappings array and PATCHes the Port webhook at `/v1/webhooks/<identifier>` when mappings differ. The Terraform module calls this script via a `null_resource` local-exec provisioner. Usage from the repo root:
+
+```bash
+# Example (requires PORT_API_TOKEN in env):
+PORT_API_TOKEN="<token>" python3 utils/create_port_mappings.py --integration-id aws_ingest --map s3-bucket:mapping-s3-bucket --map ec2-instance:mapping-ec2-instance
+```
+
+- `utils/parse_port_blueprints.py` - helper to parse `terraform/modules/port_blueprints/main.tf` and emit a `blueprints_local.json` summary. Useful for auditing blueprint identifiers and properties.
+
+Notes:
+- Ensure `PORT_API_TOKEN` is set in the environment (do NOT prefix with "Bearer ") when Terraform runs the mapping step.
+- The Terraform module `terraform/modules/port_mappings` now references `../utils/create_port_mappings.py` (was `../scripts`) and will re-run when the `mappings` trigger changes.
+

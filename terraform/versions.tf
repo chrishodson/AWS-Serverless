@@ -12,8 +12,8 @@ terraform {
       version = ">= 4.0.0"
     }
     port = {
-      source  = "port-labs/port"
-      version = ">= 0.1.0"
+      source  = "port-labs/port-labs"
+      version = "~> 2"
     }
   }
 }

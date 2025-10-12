@@ -3,9 +3,9 @@
  * outputs.tf - Outputs for the blueprints module
  */
 
-output "ec2_instance_blueprint_id" {
+output "ec2Instance_blueprint_id" {
   description = "ID of the EC2 instance blueprint"
-  value       = port_blueprint.ec2_instance.id
+  value       = port_blueprint.ec2Instance.id
 }
 
 output "s3_bucket_blueprint_id" {

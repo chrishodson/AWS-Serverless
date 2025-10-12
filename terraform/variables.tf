@@ -6,7 +6,7 @@
 variable "aws_region" {
   description = "AWS region to deploy resources"
   type        = string
-  default     = "us-east-1"
+  default     = "us-east-2"
 }
 
 variable "port_client_id" {
@@ -31,6 +31,13 @@ variable "webhook_urls" {
   description = "Map of service types to webhook URLs (if pre-existing)"
   type        = map(string)
   default     = {}
+}
+
+variable "port_api_token" {
+  description = "Port API bearer token used by provisioning scripts"
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 variable "sqs_queue_name" {
