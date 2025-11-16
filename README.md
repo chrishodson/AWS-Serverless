@@ -72,7 +72,14 @@ make apply
 ```
 
 Notes
-- You can also run the mapping script manually: `python3 utils/create_port_mappings.py --integration-id aws_ingest --map s3-bucket:mapping-s3-bucket --dry-run` (see `docs/port_mappings.md` for full examples).
+- You can also run the mapping script manually: `python3 utils/create_port_mappings.py --webhook-id aws_ingest --map s3Bucket:mapping-s3-bucket --dry-run` or run the interactive chooser:
+
+```
+export PORT_API_TOKEN="<your-token>"
+python3 utils/create_port_mappings.py --choose-webhook --dry-run
+```
+
+See `utils/README.md` for more details. (See `docs/port_mappings.md` for full examples.)
 - If you prefer CloudFormation for the Lambda + SQS stack, the file `terraform/AWS.yml` contains an embedded inline Lambda and CloudFormation resources.
 
 Other Make targets
